@@ -618,7 +618,170 @@ Rayfield:Notify({
     Image = "eye"
 })
 
+local Section = ESPTab:CreateSection("X-Ray")
 
+-- Section: Visuals
+-- Variables
+local xRayEnabled = false
+local xRayTransparency = 0.7 -- Default transparency level
+local originalTransparencies = {} -- Store original transparency values
+local affectedParts = {} -- Store parts that are modified
+
+-- Function to display system messages
+local function displaySystemMessage(text, color)
+    StarterGui:SetCore("ChatMakeSystemMessage", {
+        Text = text,
+        Color = color or Color3.fromRGB(255, 255, 255),
+        Font = Enum.Font.SourceSansBold,
+        TextSize = 18
+    })
+end
+
+-- Function to enable X-Ray Vision
+local function enableXRayVision()
+    if xRayEnabled then
+        -- Clear previous data
+        for part, originalTransparency in pairs(originalTransparencies) do
+            if part and part:IsA("BasePart") then
+                part.Transparency = originalTransparency
+            end
+        end
+        table.clear(originalTransparencies)
+        table.clear(affectedParts)
+
+        -- Find all BaseParts in Workspace
+        local success, err = pcall(function()
+            for _, part in pairs(Workspace:GetDescendants()) do
+                if part:IsA("BasePart") and not part:IsA("Terrain") and part.Transparency < 1 then
+                    -- Skip parts that are already fully transparent or belong to the local player's character
+                    local isPlayerPart = false
+                    for _, player in pairs(Players:GetPlayers()) do
+                        if player.Character and part:IsDescendantOf(player.Character) then
+                            isPlayerPart = true
+                            break
+                        end
+                    end
+                    if not isPlayerPart then
+                        originalTransparencies[part] = part.Transparency
+                        part.Transparency = xRayTransparency
+                        table.insert(affectedParts, part)
+                    end
+                end
+            end
+        end)
+
+        if not success then
+            warn("Error enabling X-Ray Vision: " .. tostring(err))
+            displaySystemMessage("{X-Ray Vision} - Error: Failed to enable X-Ray Vision.", Color3.fromRGB(255, 0, 0))
+            xRayEnabled = false
+            return
+        end
+
+        -- Connect to new parts being added
+        Workspace.DescendantAdded:Connect(function(descendant)
+            if xRayEnabled and descendant:IsA("BasePart") and not descendant:IsA("Terrain") and descendant.Transparency < 1 then
+                local isPlayerPart = false
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player.Character and descendant:IsDescendantOf(player.Character) then
+                        isPlayerPart = true
+                        break
+                    end
+                end
+                if not isPlayerPart and not originalTransparencies[descendant] then
+                    originalTransparencies[descendant] = descendant.Transparency
+                    descendant.Transparency = xRayTransparency
+                    table.insert(affectedParts, descendant)
+                end
+            end
+        end)
+
+        -- Handle parts being removed
+        Workspace.DescendantRemoving:Connect(function(descendant)
+            if originalTransparencies[descendant] then
+                originalTransparencies[descendant] = nil
+                for i, part in ipairs(affectedParts) do
+                    if part == descendant then
+                        table.remove(affectedParts, i)
+                        break
+                    end
+                end
+            end
+        end)
+    end
+end
+
+-- Function to disable X-Ray Vision
+local function disableXRayVision()
+    if not xRayEnabled then
+        for part, originalTransparency in pairs(originalTransparencies) do
+            if part and part:IsA("BasePart") then
+                part.Transparency = originalTransparency
+            end
+        end
+        table.clear(originalTransparencies)
+        table.clear(affectedParts)
+    end
+end
+
+-- Toggle for X-Ray Vision
+local Toggle = ESPTab:CreateToggle({
+    Name = "Enable X-Ray Vision",
+    CurrentValue = xRayEnabled,
+    Flag = "XRayToggle",
+    Callback = function(value)
+        xRayEnabled = value
+        if xRayEnabled then
+            enableXRayVision()
+            displaySystemMessage("{X-Ray Vision} - Enabled.", Color3.fromRGB(0, 255, 255))
+            Rayfield:Notify({
+                Title = "X-Ray Vision",
+                Content = "X-Ray Vision enabled. Warning: This feature may violate Roblox ToS and result in a ban.",
+                Duration = 5,
+                Image = "eye"
+            })
+        else
+            disableXRayVision()
+            displaySystemMessage("{X-Ray Vision} - Disabled.", Color3.fromRGB(0, 255, 255))
+            Rayfield:Notify({
+                Title = "X-Ray Vision",
+                Content = "X-Ray Vision disabled.",
+                Duration = 3,
+                Image = "eye"
+            })
+        end
+    end
+})
+
+-- Slider for Transparency
+local Slider = ESPTab:CreateSlider({
+    Name = "Transparency",
+    Range = {0, 1},
+    Increment = 0.1,
+    CurrentValue = xRayTransparency,
+    Flag = "XRayTransparencySlider",
+    Callback = function(value)
+        xRayTransparency = value
+        if xRayEnabled then
+            -- Update transparency of affected parts
+            for _, part in pairs(affectedParts) do
+                if part and part:IsA("BasePart") then
+                    part.Transparency = xRayTransparency
+                end
+            end
+        end
+    end
+})
+
+-- Notify script loaded
+Rayfield:Notify({
+    Title = "X-Ray",
+    Content = "X-Ray Vision script loaded! Use at your own risk.",
+    Duration = 5,
+    Image = "eye"
+})
+
+-- Initial system message
+displaySystemMessage("{X-Ray Vision} - " .. (xRayEnabled and "Enabled." or "Disabled."), Color3.fromRGB(0, 255, 255))
 
 
 
