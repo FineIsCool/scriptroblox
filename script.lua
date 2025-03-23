@@ -618,170 +618,96 @@ Rayfield:Notify({
     Image = "eye"
 })
 
-local Section = ESPTab:CreateSection("X-Ray")
+local Section = ESPTab:CreateSection("Brightness")
 
--- Section: Visuals
--- Variables
-local xRayEnabled = false
-local xRayTransparency = 0.7 -- Default transparency level
-local originalTransparencies = {} -- Store original transparency values
-local affectedParts = {} -- Store parts that are modified
+-- Services
+local Lighting = game:GetService("Lighting")
 
--- Function to display system messages
-local function displaySystemMessage(text, color)
-    StarterGui:SetCore("ChatMakeSystemMessage", {
-        Text = text,
-        Color = color or Color3.fromRGB(255, 255, 255),
-        Font = Enum.Font.SourceSansBold,
-        TextSize = 18
-    })
+
+-- Initialize variables
+local isEnabled = false
+local originalBrightness = Lighting.Brightness
+local originalAmbient = Lighting.Ambient
+local originalOutdoorAmbient = Lighting.OutdoorAmbient
+local originalFogEnd = Lighting.FogEnd
+local originalClockTime = Lighting.ClockTime
+local originalGlobalShadows = Lighting.GlobalShadows
+
+-- Function to enable Full Bright
+local function enableFullBright()
+    Lighting.Brightness = 2
+    Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+    Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+    Lighting.FogEnd = 100000
+    Lighting.ClockTime = 14
+    Lighting.GlobalShadows = false
 end
 
--- Function to enable X-Ray Vision
-local function enableXRayVision()
-    if xRayEnabled then
-        -- Clear previous data
-        for part, originalTransparency in pairs(originalTransparencies) do
-            if part and part:IsA("BasePart") then
-                part.Transparency = originalTransparency
-            end
-        end
-        table.clear(originalTransparencies)
-        table.clear(affectedParts)
-
-        -- Find all BaseParts in Workspace
-        local success, err = pcall(function()
-            for _, part in pairs(Workspace:GetDescendants()) do
-                if part:IsA("BasePart") and not part:IsA("Terrain") and part.Transparency < 1 then
-                    -- Skip parts that are already fully transparent or belong to the local player's character
-                    local isPlayerPart = false
-                    for _, player in pairs(Players:GetPlayers()) do
-                        if player.Character and part:IsDescendantOf(player.Character) then
-                            isPlayerPart = true
-                            break
-                        end
-                    end
-                    if not isPlayerPart then
-                        originalTransparencies[part] = part.Transparency
-                        part.Transparency = xRayTransparency
-                        table.insert(affectedParts, part)
-                    end
-                end
-            end
-        end)
-
-        if not success then
-            warn("Error enabling X-Ray Vision: " .. tostring(err))
-            displaySystemMessage("{X-Ray Vision} - Error: Failed to enable X-Ray Vision.", Color3.fromRGB(255, 0, 0))
-            xRayEnabled = false
-            return
-        end
-
-        -- Connect to new parts being added
-        Workspace.DescendantAdded:Connect(function(descendant)
-            if xRayEnabled and descendant:IsA("BasePart") and not descendant:IsA("Terrain") and descendant.Transparency < 1 then
-                local isPlayerPart = false
-                for _, player in pairs(Players:GetPlayers()) do
-                    if player.Character and descendant:IsDescendantOf(player.Character) then
-                        isPlayerPart = true
-                        break
-                    end
-                end
-                if not isPlayerPart and not originalTransparencies[descendant] then
-                    originalTransparencies[descendant] = descendant.Transparency
-                    descendant.Transparency = xRayTransparency
-                    table.insert(affectedParts, descendant)
-                end
-            end
-        end)
-
-        -- Handle parts being removed
-        Workspace.DescendantRemoving:Connect(function(descendant)
-            if originalTransparencies[descendant] then
-                originalTransparencies[descendant] = nil
-                for i, part in ipairs(affectedParts) do
-                    if part == descendant then
-                        table.remove(affectedParts, i)
-                        break
-                    end
-                end
-            end
-        end)
-    end
+-- Function to disable Full Bright (restore original settings)
+local function disableFullBright()
+    Lighting.Brightness = originalBrightness
+    Lighting.Ambient = originalAmbient
+    Lighting.OutdoorAmbient = originalOutdoorAmbient
+    Lighting.FogEnd = originalFogEnd
+    Lighting.ClockTime = originalClockTime
+    Lighting.GlobalShadows = originalGlobalShadows
 end
 
--- Function to disable X-Ray Vision
-local function disableXRayVision()
-    if not xRayEnabled then
-        for part, originalTransparency in pairs(originalTransparencies) do
-            if part and part:IsA("BasePart") then
-                part.Transparency = originalTransparency
-            end
-        end
-        table.clear(originalTransparencies)
-        table.clear(affectedParts)
-    end
-end
-
--- Toggle for X-Ray Vision
-local Toggle = ESPTab:CreateToggle({
-    Name = "Enable X-Ray Vision",
-    CurrentValue = xRayEnabled,
-    Flag = "XRayToggle",
+-- Toggle: Enable/Disable Full Bright
+ESPTab:CreateToggle({
+    Name = "Enable Full Bright",
+    CurrentValue = false,
+    Flag = "FullBrightToggle",
     Callback = function(value)
-        xRayEnabled = value
-        if xRayEnabled then
-            enableXRayVision()
-            displaySystemMessage("{X-Ray Vision} - Enabled.", Color3.fromRGB(0, 255, 255))
+        isEnabled = value
+        if isEnabled then
+            enableFullBright()
             Rayfield:Notify({
-                Title = "X-Ray Vision",
-                Content = "X-Ray Vision enabled. Warning: This feature may violate Roblox ToS and result in a ban.",
-                Duration = 5,
-                Image = "eye"
+                Title = "Full Bright",
+                Content = "Full Bright enabled.",
+                Duration = 3,
+                Image = "user"
             })
         else
-            disableXRayVision()
-            displaySystemMessage("{X-Ray Vision} - Disabled.", Color3.fromRGB(0, 255, 255))
+            disableFullBright()
             Rayfield:Notify({
-                Title = "X-Ray Vision",
-                Content = "X-Ray Vision disabled.",
+                Title = "Full Bright",
+                Content = "Full Bright disabled.",
                 Duration = 3,
-                Image = "eye"
+                Image = "user"
             })
         end
     end
 })
 
--- Slider for Transparency
-local Slider = ESPTab:CreateSlider({
-    Name = "Transparency",
-    Range = {0, 1},
+-- Slider: Brightness Level
+ESPTab:CreateSlider({
+    Name = "Brightness Level",
+    Range = {0, 5},
     Increment = 0.1,
-    CurrentValue = xRayTransparency,
-    Flag = "XRayTransparencySlider",
+    Suffix = "",
+    CurrentValue = 2,
+    Flag = "BrightnessSlider",
     Callback = function(value)
-        xRayTransparency = value
-        if xRayEnabled then
-            -- Update transparency of affected parts
-            for _, part in pairs(affectedParts) do
-                if part and part:IsA("BasePart") then
-                    part.Transparency = xRayTransparency
-                end
-            end
+        if isEnabled then
+            Lighting.Brightness = value
+            Rayfield:Notify({
+                Title = "Brightness Level",
+                Content = "Brightness set to " .. value .. ".",
+                Duration = 3,
+                Image = "user"
+            })
         end
     end
 })
 
 -- Notify script loaded
 Rayfield:Notify({
-    Title = "X-Ray",
-    Content = "X-Ray Vision script loaded! Use at your own risk.",
+    Title = "Script Loaded",
+    Content = "Full Bright script loaded!",
     Duration = 5,
-    Image = "eye"
+    Image = "user"
 })
-
--- Initial system message
-displaySystemMessage("{X-Ray Vision} - " .. (xRayEnabled and "Enabled." or "Disabled."), Color3.fromRGB(0, 255, 255))
 
 
 
